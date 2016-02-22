@@ -33,7 +33,7 @@ zR = zMax - SR*x;
 
 %% Time array
 dt = 1/52/4; % [yr]
-tSim = 1500; % [yr]
+tSim = 2500; % [yr]
 t = 0:dt:tSim;
 
 P = 2500; % period for variations in ELA [yr]
@@ -135,6 +135,7 @@ progressbar(1)
 % Animation
 indPlot = 250;
 figure
+M = [];
 for ii = 1:indPlot:length(t)
     % Find ELA position
     ELAind = find(zR_S(:,ii)+H_S(:,ii) < ELA_S(ii),1,'first');
@@ -159,6 +160,9 @@ for ii = 1:indPlot:length(t)
     tH = text('String',['ELA: ' num2str(ELA_S(ii),4) ' m']);
     tH.Position = [150 3750];
     tH.Color = 'b';
+    % Write current date on plot
+    tH = text('String',['Time: ' num2str(t(ii),4) ' yr']);
+    tH.Position = [150 500];
     % Set limits and axes
     ylim([0 4200])
     ylabel('Elevation [m]')
@@ -170,18 +174,20 @@ for ii = 1:indPlot:length(t)
     plot(x/1000,Q_S(2:end,ii))
     hold on
     % ELA position marker
-    plot([ELApos ELApos],[0 8e5],'--b')
+    plot([ELApos ELApos],[0 5e5],'--b')
     hold off
-    ylim([0 8e5])
+    ylim([0 5e5])
     ylabel('Flux [m^3/yr]')
     xlabel('Position [km]')
     
     % Save frame
-    M(:,ii) = getframe(gcf);
+    M = [M getframe(gcf)];
     pause(0.01)    
 end
 
-%movie2avi(M,'glacier','fps',24)
+% Make movie
+M = M(1:indPlot:end);
+movie2avi(M,'glacierErosion','fps',24)
 
 % Volume vs time
 Veq = (1-(1/exp(1)))*V(end); % 1 - (1/e) of equilibrium volume
@@ -190,11 +196,11 @@ teq = t(eqInd); % time to Veq
 figure
 hold on
 plot(t,V)
-plot([t(1) t(end)],[Veq Veq],'--k')
-plot([teq teq],[0 16e7],'--k')
+%plot([t(1) t(end)],[Veq Veq],'--k')
+%plot([teq teq],[0 10e7],'--k')
 hold off
 xlabel('Time [yr]')
 ylabel('Ice Volume [m^3]')
-ylim([0 16e7])
-tH = text('String',['t_{eq}: ' num2str(teq,4) ' yr']);
-tH.Position = [teq+50 1e7];
+ylim([0 10e7])
+%tH = text('String',['t_{eq}: ' num2str(teq,4) ' yr']);
+%tH.Position = [teq+50 1e7];
