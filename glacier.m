@@ -33,7 +33,7 @@ zR = zMax - SR*x;
 
 %% Time array
 dt = 1/52/4; % [yr]
-tSim = 1000; % [yr]
+tSim = 2500; % [yr]
 t = 0:dt:tSim;
 
 P = 2500; % period for variations in ELA [yr]
@@ -54,7 +54,7 @@ for ii = 1:length(t)
     z = zR + H;
         
     % Compute current ELA
-    ELA = 2500;% + 500*sin((2*pi/P)*t(ii));
+    ELA = 2500 + 500*sin((2*pi/P)*t(ii));
     ELA_S(ii) = ELA;
     
     % Evaluate net accumulation/ablation [X]
@@ -152,7 +152,7 @@ for ii = 1:indPlot:length(t)
     fill([x/1000 fliplr(x/1000)],...
         [zR_S(:,ii)' fliplr(zR_S(:,ii)'+H_S(:,ii)')],'c')
     % ELA elevation
-    plot([min(x/1000) max(x/1000)],[2500 2500],'--b')
+    plot([min(x/1000) max(x/1000)],[ELA_S(ii) ELA_S(ii)],'--b')
     % ELA position marker
     plot([ELApos ELApos],[0 4200],'--b')
     hold off
@@ -174,9 +174,9 @@ for ii = 1:indPlot:length(t)
     plot(x/1000,Q_S(2:end,ii))
     hold on
     % ELA position marker
-    plot([ELApos ELApos],[0 5e5],'--b')
+    plot([ELApos ELApos],[0 1e6],'--b')
     hold off
-    ylim([0 5e5])
+    ylim([0 1e6])
     ylabel('Flux [m^3/yr]')
     xlabel('Position [km]')
     
@@ -186,8 +186,8 @@ for ii = 1:indPlot:length(t)
 end
 
 % Make movie
-%M = M(1:indPlot:end);
-%movie2avi(M,'glacierErosion','fps',24)
+v = VideoWriter('glacierELAlong.m4v','MPEG-4');
+open(v)
 for ii = 1:length(M)
     writeVideo(v,M(ii))
 end
@@ -205,6 +205,6 @@ plot(t,V)
 hold off
 xlabel('Time [yr]')
 ylabel('Ice Volume [m^3]')
-ylim([0 10e7])
+ylim([0 10e8])
 %tH = text('String',['t_{eq}: ' num2str(teq,4) ' yr']);
 %tH.Position = [teq+50 1e7];
