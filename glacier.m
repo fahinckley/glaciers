@@ -33,7 +33,7 @@ zR = zMax - SR*x;
 
 %% Time array
 dt = 1/52/4; % [yr]
-tSim = 2500; % [yr]
+tSim = 1000; % [yr]
 t = 0:dt:tSim;
 
 P = 2500; % period for variations in ELA [yr]
@@ -111,7 +111,7 @@ for ii = 1:length(t)
     H = H.*(H > 0);
 
     % Update valley 
-    zR = zR - [0 eDot*dt];
+    %zR = zR - [0 eDot*dt];
     
     % Compute ice volume
     V(ii) = trapz(x,H);
@@ -186,8 +186,12 @@ for ii = 1:indPlot:length(t)
 end
 
 % Make movie
-M = M(1:indPlot:end);
-movie2avi(M,'glacierErosion','fps',24)
+%M = M(1:indPlot:end);
+%movie2avi(M,'glacierErosion','fps',24)
+for ii = 1:length(M)
+    writeVideo(v,M(ii))
+end
+close(v)
 
 % Volume vs time
 Veq = (1-(1/exp(1)))*V(end); % 1 - (1/e) of equilibrium volume
