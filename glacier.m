@@ -20,6 +20,7 @@ rhoI = 917; % density of ice [kg/m^3]
 rhoW = 1000; % density of water [kg/m^3]
 usl0 = 0.0012; % sliding coefficient [m/yr/Pa]
 edot0 = 0.0001; % erosion coefficient []
+bmax = 3; % maximum accumulaton [m/yr]
 
 %% Set up initial valley shape
 dx = 1000; % [m]
@@ -32,100 +33,117 @@ zMax = 3000; % [m]
 zR = zMax - SR*x;
 
 %% Time array
-dt = 1/52/4; % [yr]
-tSim = 2500; % [yr]
+dt = 1/365/2; % [yr]
+tSim = 1000; % [yr]
 t = 0:dt:tSim;
 
-P = 2500; % period for variations in ELA [yr]
+P_ELA = 500; % period for variations in ELA [yr]
+P_W = 1; % period for variations in water table [yr]
 
 %% Initial glacier shape
 H = zeros(size(x));
 
-%% Main loop
-zR_S = zeros(length(x),length(t));
-H_S = zeros(length(x),length(t));
-Q_S = zeros(length(x)+1,length(t));
-ELA_S = zeros(length(t),1);
-V = zeros(length(t),1);
+%% Allocate output
+% Specify how often to save
+saveInd = 250;
+
+% Allocate output
+zR_S = zeros(length(x),floor(length(t)/saveInd));
+H_S = zeros(length(x),floor(length(t)/saveInd));
+usl_S = zeros(length(x)-1,floor(length(t)/saveInd));
+Q_S = zeros(length(x)+1,floor(length(t)/saveInd));
+ELA_S = zeros(floor(length(t)/saveInd),1);
+V = zeros(floor(length(t)/saveInd),1);
+
+% Assign initial values
 zR_S(:,1) = zR;
 H_S(:,1) = H;
+Q = zeros(length(x)+1,1);
+
+%% Main loop
+% Initialize counter for saving output
+jj = 1;
+
+% Loop
 for ii = 1:length(t)
-    % Compute glacier surface elevation [X]
+    % Compute glacier surface elevation 
     z = zR + H;
         
     % Compute current ELA
-    ELA = 2500 + 500*sin((2*pi/P)*t(ii));
-    ELA_S(ii) = ELA;
+    ELA = 2500;% + 500*sin((2*pi/P_ELA)*t(ii));
     
-    % Evaluate net accumulation/ablation [X]
+    % Evaluate net accumulation/ablation 
     b = gamma*(z - ELA);
+    
+    % Cap accumulation
+    b(b > bmax) = bmax;
     
     % Compute ice surface slope
     dzdx = diff(z)/dx;
     
     % Get box-centered heights
-    Hm = zeros(size(dzdx)); % box-centered surface height [m]
-    for jj = 1:length(dzdx)
-        Hm(jj) = mean(H(jj:jj+1));
-    end
+    Hm = (H(1:end-1) + H(2:end))/2;
     
     % Compute basal shear stress
     dzRdx = diff(zR)/dx;
     tauB = rhoI*g*Hm.*dzRdx;
     
-    % Compute sliding speed
+    % Compute water table level
+    Hwtl = 75 + 5*sin((2*pi/P_W)*t(ii));
+    Hw = Hm - Hwtl;
+    Hw = Hw.*(Hw > 0);
+    
+    % Compute sliding speed  
+    Ne = rhoI*g*Hm - rhoW*g*Hw;
     usl = zeros(size(Hm));
-    for jj = 1:length(Hm)
-        if Hm(jj) > 0
-            Hw = Hm(jj) - 75;
-            Ne = rhoI*g*Hm(jj) - rhoW*g*Hw;
-            usl(jj) = (usl0*tauB(jj)^2)/Ne;
-        end
-    end
+    usl(Hm > 0) = (usl0*tauB(Hm > 0).^2)./Ne(Hm > 0);
     
     % Compute flux
-    Q = usl.*Hm - A*((rhoI*g*dzdx).^3).*((Hm.^5)/5);
-    %Q = usl.*H(1:end-1) + A*((rho*g*dzdx).^3).*((H(1:end-1).^5)/5);
+    Q(2:end-1) = usl.*Hm - A*((rhoI*g*dzdx).^3).*((Hm.^5)/5);
     
     % Error trap (stops simulation if there is a numeric crash)
     if any(isnan(Q))
         error('NaN in Q')
     end
     
-    % Pad flux array [X]
-    Q = [0 Q 0];
-
-    % Compute flux gradient [X]
+    % Compute flux gradient 
     dQdx = diff(Q)/dx; 
     
-    % Compute thickness rate [X] 
-    dHdt = b - dQdx;
+    % Compute thickness rate 
+    dHdt = b - dQdx';
     
     % Compute erosion rate
     eDot = edot0 * usl;
 
-    % Update glacier thickness [X]
+    % Update glacier thickness
     H = H + dHdt*dt;
     
-    % Remove negative thickness [X]
+    % Remove negative thickness
     H = H.*(H > 0);
 
     % Update valley 
-    %zR = zR - [0 eDot*dt];
+    zR = zR - [0 eDot*dt];
     
-    % Compute ice volume
-    V(ii) = trapz(x,H);
+    % Check if save point
+    if mod(ii,saveInd) == 1
+        % Compute ice volume and save
+        V(jj) = trapz(x,H);
+
+        % Save output 
+        ELA_S(jj)   = ELA;
+        zR_S(:,jj)  = zR; % rock elevation [m]
+        H_S(:,jj)   = H; % glacier thickness [m]
+        Q_S(:,jj)   = Q'; % discharge [m^3/yr]
+        usl_S(:,jj) = usl';
+        
+        % Increment counter
+        jj = jj + 1;
+    end
     
-    % Save output [X]
-    zR_S(:,ii) = zR; % rock elevation [m]
-    H_S(:,ii) = H; % glacier thickness [m]
-    Q_S(:,ii) = Q'; % discharge [m^3/yr]
-    
-    % Update progress bar [X]
-    if mod(ii,100)
+    % Update progress bar
+    if mod(ii,100) == 1
         progressbar(ii/length(t))
     end
-
 end
 
 % Clean up progress bar
@@ -133,10 +151,9 @@ progressbar(1)
 
 %% Plots
 % Animation
-indPlot = 250;
 figure
 M = [];
-for ii = 1:indPlot:length(t)
+for ii = 1:floor(length(t)/saveInd)
     % Find ELA position
     ELAind = find(zR_S(:,ii)+H_S(:,ii) < ELA_S(ii),1,'first');
     ELApos = x(ELAind)/1000;
@@ -161,7 +178,7 @@ for ii = 1:indPlot:length(t)
     tH.Position = [150 3750];
     tH.Color = 'b';
     % Write current date on plot
-    tH = text('String',['Time: ' num2str(t(ii),4) ' yr']);
+    tH = text('String',['Time: ' num2str(t(ii)*saveInd,4) ' yr']);
     tH.Position = [150 500];
     % Set limits and axes
     ylim([0 4200])
@@ -181,17 +198,24 @@ for ii = 1:indPlot:length(t)
     xlabel('Position [km]')
     
     % Save frame
-    M = [M getframe(gcf)];
+    %M = [M getframe(gcf)];
     pause(0.01)    
 end
 
 % Make movie
-v = VideoWriter('glacierELAlong.m4v','MPEG-4');
-open(v)
-for ii = 1:length(M)
-    writeVideo(v,M(ii))
-end
-close(v)
+% v = VideoWriter('glacierWater.m4v','MPEG-4');
+% open(v)
+% for ii = 1:length(M)
+%     writeVideo(v,M(ii))
+% end
+% close(v)
+
+% Peak sliding speed
+figure
+plot(t(1:saveInd:end),max(usl_S))
+ylabel('Peak Sliding Speed [m/s]')
+xlabel('Time [yr]')
+title('Sliding Speed')
 
 % Volume vs time
 Veq = (1-(1/exp(1)))*V(end); % 1 - (1/e) of equilibrium volume
@@ -199,12 +223,12 @@ eqInd = find(V > Veq,1,'first');
 teq = t(eqInd); % time to Veq
 figure
 hold on
-plot(t,V)
+plot(t(1:saveInd:end),V)
 %plot([t(1) t(end)],[Veq Veq],'--k')
 %plot([teq teq],[0 10e7],'--k')
 hold off
 xlabel('Time [yr]')
 ylabel('Ice Volume [m^3]')
-ylim([0 10e8])
+ylim([0 1e8])
 %tH = text('String',['t_{eq}: ' num2str(teq,4) ' yr']);
 %tH.Position = [teq+50 1e7];
